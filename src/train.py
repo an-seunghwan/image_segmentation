@@ -1,4 +1,9 @@
 #%%
+'''
+<reference>
+re-implementation code of https://github.com/zhixuhao/unet
+'''
+#%%
 import os
 os.chdir(r'D:\image_segmentation')
 
