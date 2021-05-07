@@ -20,8 +20,8 @@ import glob
 import skimage.io as io
 import skimage.transform as trans
 
-# os.chdir(r'D:\image_segmentation')
-os.chdir('/Users/anseunghwan/Documents/GitHub/image_segmentation')
+os.chdir(r'D:\image_segmentation')
+# os.chdir('/Users/anseunghwan/Documents/GitHub/image_segmentation')
 #%%
 def normalize(img, mask):
     img = img / 255.0
@@ -131,7 +131,7 @@ traingenerator = BuildTrainGenerator(20,
                             'image',
                             'label', 
                             data_gen_args, 
-                            save_to_dir = "data/membrane/train/aug")
+                            save_to_dir = "data/membrane/train/aug") # None
 #%%
 # augmentation result check
 num_batch = 1
@@ -208,14 +208,14 @@ def unet(pretrained_weights = None,
 #%%
 model = unet()
 model_checkpoint = ModelCheckpoint('./assets/unet_membrane.hdf5', monitor='loss', verbose=1, save_best_only=True)
-model.fit(traingenerator, steps_per_epoch=2000, epochs=5, callbacks=[model_checkpoint])
+model.fit(traingenerator, steps_per_epoch=10, epochs=1, callbacks=[model_checkpoint])
 #%%
 def BuildTestGenerator(test_path,
                         num_image = 30,
                         target_size = (256, 256),
                         as_gray = True):
     for i in range(num_image):
-        img = io.imread(os.path.join(test_path, "%d.png"%i), as_gray = as_gray)
+        img = io.imread(os.path.join(test_path, "{}.png".format(i)), as_gray = as_gray)
         img = img / 255.0
         img = trans.resize(img, target_size)
         img = np.reshape(img, img.shape + (1,))
@@ -225,11 +225,11 @@ def BuildTestGenerator(test_path,
 def saveResult(save_path, npyfile):
     for i, item in enumerate(npyfile):
         img = item[:,:,0]
-        io.imsave(os.path.join(save_path,"predict_{}.png".format(i)), img)
+        io.imsave(os.path.join(save_path, "predict_{}.png".format(i)), img)
 #%%
 testgenerator = BuildTestGenerator("data/membrane/test")
 model = unet()
-model.load_weights("unet_membrane.hdf5")
-results = model.predict_generator(testgenerator, 30, verbose=1)
+model.load_weights("./assets/unet_membrane.hdf5")
+results = model.predict(testgenerator, 30, verbose=1)
 saveResult("data/membrane/test", results)
 #%%
