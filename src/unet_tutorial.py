@@ -9,8 +9,8 @@ re-implementation code of https://github.com/zhixuhao/unet
 from keras.models import *
 from keras.layers import *
 from keras.optimizers import *
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras import backend as keras
+# from keras.callbacks import ModelCheckpoint, LearningRateScheduler
+# from keras import backend as keras
 #%%
 import keras
 from keras.preprocessing.image import ImageDataGenerator
@@ -19,6 +19,7 @@ import os
 import glob
 import skimage.io as io
 import skimage.transform as trans
+from skimage import img_as_ubyte
 
 os.chdir(r'D:\image_segmentation')
 # os.chdir('/Users/anseunghwan/Documents/GitHub/image_segmentation')
@@ -30,6 +31,7 @@ def normalize(img, mask):
     mask[mask <= 0.5] = 0.0
     return (img, mask)
 #%%
+'''augmentation'''
 data_gen_args = dict(rotation_range=0.2,
                     width_shift_range=0.05,
                     height_shift_range=0.05,
@@ -78,6 +80,7 @@ data_gen_args = dict(rotation_range=0.2,
 
 # train_generator = zip(image_generator, mask_generator)
 
+# augmentation이 수행될 때마다 image와 mask를 저장
 # sampleimg, samplemask = next(iter(train_generator))
 # print(sampleimg.shape)
 # print(samplemask.shape)
@@ -92,7 +95,7 @@ def BuildTrainGenerator(batch_size,
                     image_save_prefix  = "image",
                     mask_save_prefix  = "mask",
                     save_to_dir = None,
-                    target_size = (256, 256),
+                    target_size = (256, 256), # reshape image 512x512 -> 256x256
                     seed = 1):
     
     image_datagen = ImageDataGenerator(**aug_dict)
@@ -130,17 +133,10 @@ traingenerator = BuildTrainGenerator(20,
                             'data/membrane/train', 
                             'image',
                             'label', 
-                            data_gen_args, 
-                            save_to_dir = "data/membrane/train/aug") # None
+                            data_gen_args) 
 #%%
-# augmentation result check
-num_batch = 1
-for i, batch in enumerate(traingenerator):
-    if(i >= num_batch):
-        break
-#%%
-def unet(pretrained_weights = None, 
-        input_size = (256, 256, 1)):
+'''model architecture'''
+def BuildUnet(pretrained_weights = None, input_size = (256, 256, 1)):
     
     '''contracting path'''
     inputs = Input(input_size)
@@ -206,9 +202,15 @@ def unet(pretrained_weights = None,
 
     return model
 #%%
-model = unet()
-model_checkpoint = ModelCheckpoint('./assets/unet_membrane.hdf5', monitor='loss', verbose=1, save_best_only=True)
-model.fit(traingenerator, steps_per_epoch=10, epochs=1, callbacks=[model_checkpoint])
+model = BuildUnet()
+# model_checkpoint = ModelCheckpoint('./assets/unet_membrane.hdf5', monitor='loss', verbose=1, save_best_only=True)
+# model.fit(traingenerator, steps_per_epoch=10, epochs=1, callbacks=[model_checkpoint])
+model.fit(traingenerator, steps_per_epoch=2000, epochs=5) # no callbacks
+#%%
+model.save_weights('./assets/weights')
+#%%
+imported = BuildUnet()
+imported.load_weights('./assets/weights').expect_partial()
 #%%
 def BuildTestGenerator(test_path,
                         num_image = 30,
@@ -219,17 +221,28 @@ def BuildTestGenerator(test_path,
         img = img / 255.0
         img = trans.resize(img, target_size)
         img = np.reshape(img, img.shape + (1,))
-        # img = np.reshape(img, (1,)+img.shape)
+        img = np.reshape(img, (1,)+img.shape)
         yield img
 #%%
 def saveResult(save_path, npyfile):
     for i, item in enumerate(npyfile):
-        img = item[:,:,0]
-        io.imsave(os.path.join(save_path, "predict_{}.png".format(i)), img)
+        img = item[:, :, 0]
+        io.imsave(os.path.join(save_path, "predict_{}.png".format(i)), img_as_ubyte(img))
 #%%
 testgenerator = BuildTestGenerator("data/membrane/test")
-model = unet()
-model.load_weights("./assets/unet_membrane.hdf5")
-results = model.predict(testgenerator, 30, verbose=1)
+results = imported.predict(testgenerator, 30, verbose=1)
 saveResult("data/membrane/test", results)
+#%%
+'''test set result'''
+import matplotlib.pyplot as plt
+testgenerator = BuildTestGenerator("data/membrane/test")
+
+for i, testimg in enumerate(testgenerator):
+    fig, axes = plt.subplots(1, 2, figsize=(6, 3))
+    axes.flatten()[0].imshow(trans.resize(testimg[0, ...], (256, 256, 1)), 'gray')
+    axes.flatten()[1].imshow(results[i, ...], 'gray')
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+    if (i >= 4): break
 #%%
