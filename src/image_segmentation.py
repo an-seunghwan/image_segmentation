@@ -16,80 +16,38 @@ import os
 os.chdir(r'D:\LGVAE')
 # os.chdir('/Users/anseunghwan/Documents/GitHub/LGVAE')
 dataset, info = tfds.load('oxford_iiit_pet:3.*.*', with_info=True)
-# data_directory = '/Users/anseunghwan/Documents/segmentation_datasets'
-data_directory = 'D:/segmentation_datasets'
 #%%
-from subprocess import check_output
-
-# folder_names = check_output(["ls", data_directory]).decode("utf8").split('\n')[:-1]
-import re
-folder_names = [x for x in os.listdir(data_directory) if not x.endswith('.txt')]
-
-# images
-img_list = []
-for k in range(len(folder_names)):
-    # file_names = check_output(["ls", data_directory + '/' + folder_names[k] + '/images']).decode("utf8").split('\n')[:-1]
-    file_names = os.listdir(data_directory + '/' + folder_names[k] + '/images')
-    for i in tqdm(range(len(file_names)), desc=folder_names[k]):
-        img_list.append(plt.imread(data_directory + '/' + folder_names[k] + '/images/' + file_names[i]))
-img_list = np.array(img_list)
-print('images 데이터 크기: ', img_list.shape)
-
-# normalization
-img_list = (img_list - 127.5) / 127.5
-
-# annotations
-anno_list = []
-for k in range(len(folder_names)):
-    # file_names = check_output(["ls", data_directory + '/' + folder_names[k] + '/annotations/trimaps']).decode("utf8").split('\n')[:-1]
-    file_names = os.listdir(data_directory + '/' + folder_names[k] + '/annotations/trimaps')
-    for i in tqdm(range(len(file_names)), desc=folder_names[k]):
-        anno_list.append(plt.imread(data_directory + '/' + folder_names[k] + '/annotations/trimaps/' + file_names[i])[:, :, [0]])
-anno_list = np.array(anno_list)
-print('annotation 데이터 크기: ', anno_list.shape)
-
-code = np.unique(anno_list) # (object, background)
-anno_list[np.where(anno_list == code[0])] = 1.0 # object
-anno_list[np.where(anno_list == code[1])] = 0.0 # background
-
-# plt.imshow(anno_list[0][:, :, 0], 'gray')
-
-assert img_list.shape[0] == anno_list.shape[0]
+def normalize(input_image, input_mask):
+    input_image = tf.cast(input_image, tf.float32) / 255.0
+    input_mask -= 1 # change label {1, 2, 3} -> {0, 1, 2}
+    return input_image, input_mask
 #%%
-from tensorflow.keras.utils import Sequence
-import math
+'''augmentation'''
+@tf.function
+def load_image_train(datapoint):
+    input_image = tf.image.resize(datapoint['image'], (128, 128))
+    input_mask = tf.image.resize(datapoint['segmentation_mask'], (128, 128))
 
-class Dataloader(Sequence):
+    if tf.random.uniform(()) > 0.5:
+        input_image = tf.image.flip_left_right(input_image)
+        input_mask = tf.image.flip_left_right(input_mask)
 
-    def __init__(self, x_set, y_set, batch_size, shuffle=False):
-        self.x, self.y = x_set, y_set
-        self.batch_size = batch_size
-        self.shuffle=shuffle
-        self.on_epoch_end()
+    input_image, input_mask = normalize(input_image, input_mask)
 
-    def __len__(self):
-        return math.ceil(len(self.x) / self.batch_size)
+    return input_image, input_mask
 
-    def __getitem__(self, idx):
-        indices = self.indices[idx * self.batch_size : (idx + 1) * self.batch_size]
+def load_image_test(datapoint):
+    input_image = tf.image.resize(datapoint['image'], (128, 128))
+    input_mask = tf.image.resize(datapoint['segmentation_mask'], (128, 128))
 
-        batch_x = np.array([self.x[i] for i in indices])
-        batch_y = np.array([self.y[i] for i in indices])
-        
-        batch_x = tf.cast(batch_x, tf.float32)
-        batch_y = tf.cast(batch_y, tf.float32)
-        
-        if tf.random.uniform(()) > 0.50:
-            batch_x = tf.image.flip_left_right(batch_x)
-            batch_y = tf.image.flip_left_right(batch_y)
+    input_image, input_mask = normalize(input_image, input_mask)
 
-        return batch_x, batch_y
-
-    # epoch이 끝날때마다 실행
-    def on_epoch_end(self):
-        self.indices = np.arange(len(self.x))
-        if self.shuffle == True:
-            np.random.shuffle(self.indices)
+    return input_image, input_mask
+#%%
+TRAIN_LENGTH = info.splits['train'].num_examples
+BATCH_SIZE = 64
+BUFFER_SIZE = 1000
+STEPS_PER_EPOCH = TRAIN_LENGTH // BATCH_SIZE
 #%%
 TRAIN_LENGTH = len(img_list)
 EPOCHS = 20
