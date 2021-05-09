@@ -6,14 +6,14 @@ re-implementation code of https://github.com/zhixuhao/unet
 - only binary classification
 '''
 #%%
+import keras
+from keras.preprocessing.image import ImageDataGenerator
 from keras.models import *
 from keras.layers import *
 from keras.optimizers import *
 # from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 # from keras import backend as keras
 #%%
-import keras
-from keras.preprocessing.image import ImageDataGenerator
 import numpy as np 
 import os
 import glob
@@ -21,9 +21,9 @@ import skimage.io as io
 import skimage.transform as trans
 from skimage import img_as_ubyte
 
-os.chdir(r'D:\image_segmentation')
-# os.chdir('/Users/anseunghwan/Documents/GitHub/image_segmentation')
+os.chdir('/home/jeon/Desktop/an/image_segmentation')
 #%%
+'''image input normalization'''
 def normalize(img, mask):
     img = img / 255.0
     mask = mask / 255.0
@@ -137,61 +137,61 @@ traingenerator = BuildTrainGenerator(10,
 #%%
 '''
 model architecture
-# of parameters: 31,031,685
+(# of parameters: 31,031,685)
 '''
-def BuildUnet(pretrained_weights = None, input_size = (256, 256, 1)):
+def BuildUnet(input_size = (256, 256, 1)):
     
     '''contracting path'''
     inputs = Input(input_size)
     conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(inputs)
-    conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv1)
+    conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv1) # 256x256x64
+    
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1) # 128x128x64
-    
     conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool1)
-    conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv2)
+    conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv2) # 128x128x128
+    
     pool2 = MaxPooling2D(pool_size=(2, 2))(conv2) # 64x64x128
-    
     conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool2)
-    conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv3)
+    conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv3) # 64x64x256
+    
     pool3 = MaxPooling2D(pool_size=(2, 2))(conv3) # 32x32x256
-    
     conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool3)
-    conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv4)
-    drop4 = Dropout(0.5)(conv4) # 32x32x512, augmentation
+    conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv4) # 32x32x512
+    drop4 = Dropout(0.5)(conv4) # 32x32x512, implicit augmentation
     
-    pool4 = MaxPooling2D(pool_size=(2, 2))(drop4) # 16x16x512
-
     '''bottle-neck'''
+    pool4 = MaxPooling2D(pool_size=(2, 2))(drop4) # 16x16x512
     conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool4)
     conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv5)
-    drop5 = Dropout(0.5)(conv5) # 16x16x1024, augmentation
+    drop5 = Dropout(0.5)(conv5) # 16x16x1024, implicit augmentation
 
     '''expanding path'''
     updrop5 = UpSampling2D(size = (2, 2))(drop5) # 32x32x1024
-    up6 = Conv2D(512, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(updrop5) 
+    up6 = Conv2D(512, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(updrop5) # 32x32x512
     merge6 = concatenate([drop4, up6], axis = 3)
     conv6 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge6)
     conv6 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv6)
 
     upconv6 = UpSampling2D(size = (2, 2))(conv6) # 64x64x512
-    up7 = Conv2D(256, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(upconv6)
+    up7 = Conv2D(256, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(upconv6) #64x64x256
     merge7 = concatenate([conv3, up7], axis = 3)
     conv7 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge7)
     conv7 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv7)
 
     upconv7 = UpSampling2D(size = (2, 2))(conv7) # 128x128x256
-    up8 = Conv2D(128, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(upconv7)
+    up8 = Conv2D(128, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(upconv7) # 128x128x128
     merge8 = concatenate([conv2, up8], axis = 3)
     conv8 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge8)
     conv8 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv8)
 
     upconv8 = UpSampling2D(size = (2, 2))(conv8) # 256x256x128
-    up9 = Conv2D(64, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(upconv8)
+    up9 = Conv2D(64, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(upconv8) # 256x256x64
     merge9 = concatenate([conv1, up9], axis = 3)
     conv9 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge9)
     conv9 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv9)
     conv9 = Conv2D(2, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv9) # 256x256x2, final feature map
     
+    '''output layer'''
     conv10 = Conv2D(1, 1, activation = 'sigmoid')(conv9)
 
     model = Model(inputs, conv10)
@@ -200,11 +200,9 @@ def BuildUnet(pretrained_weights = None, input_size = (256, 256, 1)):
     
     model.summary()
 
-    if(pretrained_weights):
-    	model.load_weights(pretrained_weights)
-
     return model
 #%%
+'''train'''
 model = BuildUnet()
 # model_checkpoint = ModelCheckpoint('./assets/unet_membrane.hdf5', monitor='loss', verbose=1, save_best_only=True)
 # model.fit(traingenerator, steps_per_epoch=10, epochs=1, callbacks=[model_checkpoint])
@@ -233,6 +231,7 @@ def saveResult(save_path, npyfile):
         img = item[:, :, 0]
         io.imsave(os.path.join(save_path, "predict_{}.png".format(i)), img_as_ubyte(img))
 #%%
+'''test result'''
 testgenerator = BuildTestGenerator("data/membrane/test")
 results = imported.predict(testgenerator, 30, verbose=1)
 saveResult("data/membrane/test", results)
