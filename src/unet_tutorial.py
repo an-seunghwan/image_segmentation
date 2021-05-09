@@ -40,50 +40,54 @@ data_gen_args = dict(rotation_range=0.2,
                     horizontal_flip=True,
                     fill_mode='nearest')
 #%%
-# batch_size = 20
-# train_path = 'data/membrane/train'
-# image_folder = 'image'
-# mask_folder = 'label'
-# aug_dict = data_gen_args
-# image_color_mode = "grayscale"
-# mask_color_mode = "grayscale"
-# image_save_prefix = "image"
-# mask_save_prefix  = "mask"
-# save_to_dir = "data/membrane/train/aug"
-# target_size = (256, 256)
-# seed = 1
+batch_size = 20
+train_path = 'data/membrane/train'
+image_folder = 'image'
+mask_folder = 'label'
+aug_dict = data_gen_args
+image_color_mode = "grayscale"
+mask_color_mode = "grayscale"
+image_save_prefix = "image"
+mask_save_prefix  = "mask"
+save_to_dir = "data/membrane/train/aug"
+target_size = (256, 256)
+seed = 1
 #%%
-# image_datagen = ImageDataGenerator(**data_gen_args)
-# mask_datagen = ImageDataGenerator(**data_gen_args)
+image_datagen = ImageDataGenerator(**data_gen_args)
+mask_datagen = ImageDataGenerator(**data_gen_args)
 
-# image_generator = image_datagen.flow_from_directory(
-#     train_path,
-#     classes = [image_folder],
-#     class_mode = None,
-#     color_mode = image_color_mode,
-#     target_size = target_size,
-#     batch_size = batch_size,
-#     save_to_dir = save_to_dir,
-#     save_prefix  = image_save_prefix,
-#     seed = seed)
+image_generator = image_datagen.flow_from_directory(
+    train_path,
+    classes = [image_folder],
+    class_mode = None,
+    color_mode = image_color_mode,
+    target_size = target_size,
+    batch_size = batch_size,
+    save_to_dir = save_to_dir,
+    save_prefix  = image_save_prefix,
+    seed = seed)
 
-# mask_generator = mask_datagen.flow_from_directory(
-#     train_path,
-#     classes = [mask_folder],
-#     class_mode = None,
-#     color_mode = mask_color_mode,
-#     target_size = target_size,
-#     batch_size = batch_size,
-#     save_to_dir = save_to_dir,
-#     save_prefix  = mask_save_prefix,
-#     seed = seed)
+mask_generator = mask_datagen.flow_from_directory(
+    train_path,
+    classes = [mask_folder],
+    class_mode = None,
+    color_mode = mask_color_mode,
+    target_size = target_size,
+    batch_size = batch_size,
+    save_to_dir = save_to_dir,
+    save_prefix  = mask_save_prefix,
+    seed = seed)
 
-# train_generator = zip(image_generator, mask_generator)
+traingenerator = zip(image_generator, mask_generator)
 
 # augmentation이 수행될 때마다 image와 mask를 저장
-# sampleimg, samplemask = next(iter(train_generator))
-# print(sampleimg.shape)
-# print(samplemask.shape)
+sampleimg, samplemask = next(iter(traingenerator))
+print(sampleimg.shape)
+print(samplemask.shape)
+#%%
+del image_datagen
+del mask_datagen
+del traingenerator
 #%%
 def BuildTrainGenerator(batch_size,
                     train_path,
@@ -145,20 +149,19 @@ def BuildUnet(input_size = (256, 256, 1)):
     inputs = Input(input_size)
     conv1 = Conv2D(filters = 64, kernel_size = 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(inputs)
     conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv1) # 256x256x64
-    
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1) # 128x128x64
+    
     conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool1)
     conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv2) # 128x128x128
-    
     pool2 = MaxPooling2D(pool_size=(2, 2))(conv2) # 64x64x128
+    
     conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool2)
     conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv3) # 64x64x256
-    
     pool3 = MaxPooling2D(pool_size=(2, 2))(conv3) # 32x32x256
+    
     conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool3)
     conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv4) # 32x32x512
     drop4 = Dropout(0.5)(conv4) # 32x32x512, implicit augmentation
-    
     pool4 = MaxPooling2D(pool_size=(2, 2))(drop4) # 16x16x512
     
     '''bottle-neck'''
@@ -190,7 +193,6 @@ def BuildUnet(input_size = (256, 256, 1)):
     merge9 = concatenate([conv1, up9], axis = 3)
     conv9 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge9)
     conv9 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv9)
-    
     conv9 = Conv2D(2, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv9) # 256x256x2, final feature map
     
     '''output layer'''
@@ -206,6 +208,7 @@ def BuildUnet(input_size = (256, 256, 1)):
 #%%
 '''train'''
 model = BuildUnet()
+#%%
 # model_checkpoint = ModelCheckpoint('./assets/unet_membrane.hdf5', monitor='loss', verbose=1, save_best_only=True)
 # model.fit(traingenerator, steps_per_epoch=10, epochs=1, callbacks=[model_checkpoint])
 model.fit(traingenerator, steps_per_epoch=4000, epochs=5) # no callbacks
@@ -238,16 +241,16 @@ testgenerator = BuildTestGenerator("data/membrane/test")
 results = imported.predict(testgenerator, 30, verbose=1)
 saveResult("data/membrane/test", results)
 #%%
-# '''test set result'''
-# import matplotlib.pyplot as plt
-# testgenerator = BuildTestGenerator("data/membrane/test")
+'''test result'''
+import matplotlib.pyplot as plt
+testgenerator = BuildTestGenerator("data/membrane/test")
 
-# for i, testimg in enumerate(testgenerator):
-#     fig, axes = plt.subplots(1, 2, figsize=(6, 3))
-#     axes.flatten()[0].imshow(trans.resize(testimg[0, ...], (256, 256, 1)), 'gray')
-#     axes.flatten()[1].imshow(results[i, ...], 'gray')
-#     plt.tight_layout()
-#     plt.show()
-#     plt.close()
-#     if (i >= 4): break
+for i, testimg in enumerate(testgenerator):
+    fig, axes = plt.subplots(1, 2, figsize=(6, 3))
+    axes.flatten()[0].imshow(trans.resize(testimg[0, ...], (256, 256, 1)), 'gray')
+    axes.flatten()[1].imshow(results[i, ...], 'gray')
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+    if (i >= 4): break
 #%%
