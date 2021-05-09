@@ -159,8 +159,9 @@ def BuildUnet(input_size = (256, 256, 1)):
     conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv4) # 32x32x512
     drop4 = Dropout(0.5)(conv4) # 32x32x512, implicit augmentation
     
-    '''bottle-neck'''
     pool4 = MaxPooling2D(pool_size=(2, 2))(drop4) # 16x16x512
+    
+    '''bottle-neck'''
     conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool4)
     conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv5)
     drop5 = Dropout(0.5)(conv5) # 16x16x1024, implicit augmentation
@@ -189,6 +190,7 @@ def BuildUnet(input_size = (256, 256, 1)):
     merge9 = concatenate([conv1, up9], axis = 3)
     conv9 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge9)
     conv9 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv9)
+    
     conv9 = Conv2D(2, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv9) # 256x256x2, final feature map
     
     '''output layer'''
