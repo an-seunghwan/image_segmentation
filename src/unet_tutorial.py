@@ -143,7 +143,7 @@ def BuildUnet(input_size = (256, 256, 1)):
     
     '''contracting path'''
     inputs = Input(input_size)
-    conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(inputs)
+    conv1 = Conv2D(filters = 64, kernel_size = 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(inputs)
     conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv1) # 256x256x64
     
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1) # 128x128x64
