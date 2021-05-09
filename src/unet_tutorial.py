@@ -129,13 +129,16 @@ def BuildTrainGenerator(batch_size,
         img, mask = normalize(img, mask)
         yield (img, mask) # generate image on demand
 #%%
-traingenerator = BuildTrainGenerator(20, 
+traingenerator = BuildTrainGenerator(10, 
                             'data/membrane/train', 
                             'image',
                             'label', 
                             data_gen_args) 
 #%%
-'''model architecture'''
+'''
+model architecture
+# of parameters: 31,031,685
+'''
 def BuildUnet(pretrained_weights = None, input_size = (256, 256, 1)):
     
     '''contracting path'''
@@ -205,7 +208,8 @@ def BuildUnet(pretrained_weights = None, input_size = (256, 256, 1)):
 model = BuildUnet()
 # model_checkpoint = ModelCheckpoint('./assets/unet_membrane.hdf5', monitor='loss', verbose=1, save_best_only=True)
 # model.fit(traingenerator, steps_per_epoch=10, epochs=1, callbacks=[model_checkpoint])
-model.fit(traingenerator, steps_per_epoch=2000, epochs=5) # no callbacks
+model.fit(traingenerator, steps_per_epoch=4000, epochs=5) # no callbacks
+# last accuracy: 0.9791
 #%%
 model.save_weights('./assets/weights')
 #%%
@@ -233,16 +237,16 @@ testgenerator = BuildTestGenerator("data/membrane/test")
 results = imported.predict(testgenerator, 30, verbose=1)
 saveResult("data/membrane/test", results)
 #%%
-'''test set result'''
-import matplotlib.pyplot as plt
-testgenerator = BuildTestGenerator("data/membrane/test")
+# '''test set result'''
+# import matplotlib.pyplot as plt
+# testgenerator = BuildTestGenerator("data/membrane/test")
 
-for i, testimg in enumerate(testgenerator):
-    fig, axes = plt.subplots(1, 2, figsize=(6, 3))
-    axes.flatten()[0].imshow(trans.resize(testimg[0, ...], (256, 256, 1)), 'gray')
-    axes.flatten()[1].imshow(results[i, ...], 'gray')
-    plt.tight_layout()
-    plt.show()
-    plt.close()
-    if (i >= 4): break
+# for i, testimg in enumerate(testgenerator):
+#     fig, axes = plt.subplots(1, 2, figsize=(6, 3))
+#     axes.flatten()[0].imshow(trans.resize(testimg[0, ...], (256, 256, 1)), 'gray')
+#     axes.flatten()[1].imshow(results[i, ...], 'gray')
+#     plt.tight_layout()
+#     plt.show()
+#     plt.close()
+#     if (i >= 4): break
 #%%
