@@ -6,6 +6,8 @@ re-implementation code of https://github.com/zhixuhao/unet
 - only binary classification
 '''
 #%%
+# import tensorflow as tf
+# tf.keras.preprocessing.image.ImageDataGenerator
 import keras
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import *
@@ -17,6 +19,7 @@ from keras.optimizers import *
 import numpy as np 
 import os
 import glob
+import matplotlib.pyplot as plt
 import skimage.io as io
 import skimage.transform as trans
 from skimage import img_as_ubyte
@@ -144,26 +147,27 @@ model architecture
 (# of parameters: 31,031,685)
 '''
 def BuildUnet(input_size = (256, 256, 1)):
-    
+    # input_size = (256, 256, 1)
+
     '''contracting path'''
     inputs = Input(input_size)
     conv1 = Conv2D(filters = 64, kernel_size = 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(inputs)
     conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv1) # 256x256x64
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1) # 128x128x64
-    
+
     conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool1)
     conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv2) # 128x128x128
     pool2 = MaxPooling2D(pool_size=(2, 2))(conv2) # 64x64x128
-    
+
     conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool2)
     conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv3) # 64x64x256
     pool3 = MaxPooling2D(pool_size=(2, 2))(conv3) # 32x32x256
-    
+
     conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool3)
     conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv4) # 32x32x512
     drop4 = Dropout(0.5)(conv4) # 32x32x512, implicit augmentation
     pool4 = MaxPooling2D(pool_size=(2, 2))(drop4) # 16x16x512
-    
+
     '''bottle-neck'''
     conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool4)
     conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv5)
@@ -172,7 +176,7 @@ def BuildUnet(input_size = (256, 256, 1)):
     '''expanding path'''
     updrop5 = UpSampling2D(size = (2, 2))(drop5) # 32x32x1024
     up6 = Conv2D(512, 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(updrop5) # 32x32x512
-    merge6 = concatenate([drop4, up6], axis = 3)
+    merge6 = concatenate([drop4, up6], axis = 3) # skip connection
     conv6 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge6)
     conv6 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv6)
 
@@ -194,14 +198,14 @@ def BuildUnet(input_size = (256, 256, 1)):
     conv9 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge9)
     conv9 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv9)
     conv9 = Conv2D(2, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv9) # 256x256x2, final feature map
-    
+
     '''output layer'''
     conv10 = Conv2D(1, 1, activation = 'sigmoid')(conv9)
 
     model = Model(inputs, conv10)
 
     model.compile(optimizer = Adam(lr = 1e-4), loss = 'binary_crossentropy', metrics = ['accuracy'])
-    
+
     model.summary()
 
     return model
@@ -213,6 +217,16 @@ model = BuildUnet()
 # model.fit(traingenerator, steps_per_epoch=10, epochs=1, callbacks=[model_checkpoint])
 model.fit(traingenerator, steps_per_epoch=4000, epochs=5) # no callbacks
 # last accuracy: 0.9791
+#%%
+# '''last feature map'''
+# model2 = Model(inputs, conv9)
+# testgenerator = BuildTestGenerator("data/membrane/test")
+# results = model2.predict(testgenerator, 30, verbose=1)
+# print(np.all(results >= 0))
+# plt.figure(figsize=(10, 10))
+# plt.imshow(results[0][:, :, 0])
+# plt.figure(figsize=(10, 10))
+# plt.imshow(results[0][:, :, 1])
 #%%
 model.save_weights('./assets/weights')
 #%%
@@ -242,7 +256,6 @@ results = imported.predict(testgenerator, 30, verbose=1)
 saveResult("data/membrane/test", results)
 #%%
 '''test result'''
-import matplotlib.pyplot as plt
 testgenerator = BuildTestGenerator("data/membrane/test")
 
 for i, testimg in enumerate(testgenerator):
