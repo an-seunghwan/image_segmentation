@@ -8,7 +8,7 @@ re-implementation code of https://github.com/zhixuhao/unet
 #%%
 # import tensorflow as tf
 # tf.keras.preprocessing.image.ImageDataGenerator
-import keras
+import tensorflow.keras as keras
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import *
 from keras.layers import *
